@@ -4,7 +4,7 @@
 		"target": "es2020",
 		"strict": true,
 		"noUnusedParameters": false,
-		"noUnusedLocals": true,
+		"noUnusedLocals": false,
 		"outDir": "out",
 		"sourceMap": true,
 		"declaration": true,

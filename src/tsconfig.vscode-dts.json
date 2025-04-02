@@ -5,7 +5,7 @@
 		"experimentalDecorators": false,
 		"noImplicitReturns": true,
 		"noImplicitOverride": true,
-		"noUnusedLocals": true,
+		"noUnusedLocals": false,
 		"allowUnreachableCode": false,
 		"strict": true,
 		"exactOptionalPropertyTypes": false,

@@ -597,7 +597,7 @@ export class CodeApplication extends Disposable {
 		this.lifecycleMainService.phase = LifecycleMainPhase.Ready;
 
 		// Open Windows
-		await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
+		// await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
 
 		// Signal phase: after window open
 		this.lifecycleMainService.phase = LifecycleMainPhase.AfterWindowOpen;
@@ -1352,6 +1352,7 @@ export class CodeApplication extends Disposable {
 			forceProfile,
 			forceTempProfile
 		});
+		// return null;
 	}
 
 	private afterWindowOpen(): void {
