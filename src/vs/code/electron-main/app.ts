@@ -122,12 +122,18 @@ import { NativeMcpDiscoveryHelperService } from '../../platform/mcp/node/nativeM
 import { IWebContentExtractorService } from '../../platform/webContentExtractor/common/webContentExtractor.js';
 import { NativeWebContentExtractorService } from '../../platform/webContentExtractor/electron-main/webContentExtractorService.js';
 import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetry.js';
+import { createDesktopWindow } from '../../../frontend/module/mainWindowsUtiles.js'
 
 /**
  * The main VS Code application. There will only ever be one instance,
  * even if the user starts many instances (e.g. from the command line).
+ *
  */
+
+
 export class CodeApplication extends Disposable {
+
+
 
 	private static readonly SECURITY_PROTOCOL_HANDLING_CONFIRMATION_SETTING_KEY = {
 		[Schemas.file]: 'security.promptForLocalFileProtocolHandling' as const,
@@ -153,10 +159,21 @@ export class CodeApplication extends Disposable {
 		@IUserDataProfilesMainService private readonly userDataProfilesMainService: IUserDataProfilesMainService
 	) {
 		super();
-
+		CodeApplication._logService = this.logService;
 		this.configureSession();
 		this.registerListeners();
 	}
+
+
+	  // 添加静态属性
+	  private static _logService: ILogService | undefined;
+	 // 提供静态访问方法
+	 public static getLogService(): ILogService {
+		if (!CodeApplication._logService) {
+		  throw new Error('LogService not initialized');
+		}
+		return CodeApplication._logService;
+	  }
 
 	private configureSession(): void {
 
@@ -597,7 +614,13 @@ export class CodeApplication extends Disposable {
 		this.lifecycleMainService.phase = LifecycleMainPhase.Ready;
 
 		// Open Windows
+
+		createDesktopWindow();
 		// await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
+
+
+
+		// this.logService.trace(`bbbbbbb=============`);
 
 		// Signal phase: after window open
 		this.lifecycleMainService.phase = LifecycleMainPhase.AfterWindowOpen;
@@ -618,6 +641,8 @@ export class CodeApplication extends Disposable {
 		}, 2500));
 		eventuallyPhaseScheduler.schedule();
 	}
+
+
 
 	private async setupProtocolUrlHandlers(accessor: ServicesAccessor, mainProcessElectronServer: ElectronIPCServer): Promise<IInitialProtocolUrls | undefined> {
 		const windowsMainService = this.windowsMainService = accessor.get(IWindowsMainService);
@@ -1235,6 +1260,7 @@ export class CodeApplication extends Disposable {
 	}
 
 	private async openFirstWindow(accessor: ServicesAccessor, initialProtocolUrls: IInitialProtocolUrls | undefined): Promise<ICodeWindow[]> {
+		this.logService.info('update#setState', "aaaaaaaaaa");
 		const windowsMainService = this.windowsMainService = accessor.get(IWindowsMainService);
 		this.auxiliaryWindowsMainService = accessor.get(IAuxiliaryWindowsMainService);
 
