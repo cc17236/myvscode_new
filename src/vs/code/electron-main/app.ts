@@ -122,7 +122,7 @@ import { NativeMcpDiscoveryHelperService } from '../../platform/mcp/node/nativeM
 import { IWebContentExtractorService } from '../../platform/webContentExtractor/common/webContentExtractor.js';
 import { NativeWebContentExtractorService } from '../../platform/webContentExtractor/electron-main/webContentExtractorService.js';
 import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetry.js';
-import { createDesktopWindow } from '../../../frontend/module/mainWindowsUtiles.js'
+import { createDesktopWindow, createUpdateWindow } from '../../../frontend/modules/mainWindowsUtiles.js'
 
 /**
  * The main VS Code application. There will only ever be one instance,
@@ -159,21 +159,9 @@ export class CodeApplication extends Disposable {
 		@IUserDataProfilesMainService private readonly userDataProfilesMainService: IUserDataProfilesMainService
 	) {
 		super();
-		CodeApplication._logService = this.logService;
 		this.configureSession();
 		this.registerListeners();
 	}
-
-
-	  // 添加静态属性
-	  private static _logService: ILogService | undefined;
-	 // 提供静态访问方法
-	 public static getLogService(): ILogService {
-		if (!CodeApplication._logService) {
-		  throw new Error('LogService not initialized');
-		}
-		return CodeApplication._logService;
-	  }
 
 	private configureSession(): void {
 

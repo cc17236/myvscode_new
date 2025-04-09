@@ -37,10 +37,10 @@ interface ElectronAPI {
 	) => () => void;
 	removeListener: (channel: string) => void;
 	getOSType: () => OSPlatform;
-	once: <T extends unknown[]>(
-		channel: string,
-		callback: (event: IpcRendererEvent, ...args: T) => void
-	) => void;
+	// once: <T extends unknown[]>(
+	// 	channel: string,
+	// 	callback: (event: IpcRendererEvent, ...args: T) => void
+	// ) => void;
 }
 
 // 创建符合 ElectronAPI 接口的对象
@@ -103,14 +103,14 @@ const electronAPI: ElectronAPI = {
 
 	getOSType: () => getOSType(),
 
-	once: <T extends unknown[]>(
-		channel: string,
-		callback: (event: IpcRendererEvent, ...args: T) => void
-	) => {
-		ipcRenderer.once(channel, (event, ...args) =>
-			callback(event, ...(args as T))
-		);
-	},
+	// once: <T extends unknown[]>(
+	// 	channel: string,
+	// 	callback: (event: IpcRendererEvent, ...args: T) => void
+	// ) => {
+	// 	ipcRenderer.once(channel, (event, ...args) =>
+	// 		callback(event, ...(args as T))
+	// 	);
+	// },
 };
 
 // 暴露给渲染进程

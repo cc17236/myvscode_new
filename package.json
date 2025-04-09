@@ -1,6 +1,6 @@
 {
   "name": "code-oss-dev",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "distro": "d42d927c558e17ea6e489cff62878654737d85f7",
   "author": {
     "name": "Microsoft Corporation"
@@ -113,7 +113,11 @@
     "vscode-regexpp": "^3.1.0",
     "vscode-textmate": "9.2.0",
     "yauzl": "^3.0.0",
-    "yazl": "^2.4.3"
+    "yazl": "^2.4.3",
+    "electron-log": "5.2.0",
+    "axios": "1.7.0",
+    "extract-zip": "2.0.1",
+    "fs-extra": "11.2.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0",
@@ -121,6 +125,7 @@
     "@types/cookie": "^0.3.3",
     "@types/debug": "^4.1.5",
     "@types/eslint": "^9.6.1",
+    "@types/fs-extra": "^11.0.4",
     "@types/gulp-svgmin": "^1.2.1",
     "@types/http-proxy-agent": "^2.0.1",
     "@types/kerberos": "^1.1.2",
@@ -221,11 +226,7 @@
     "webpack-cli": "^5.1.4",
     "webpack-stream": "^7.0.0",
     "xml2js": "^0.5.0",
-    "yaserver": "^0.4.0",
-    "axios": "1.7.0",
-    "electron-log": "5.2.0",
-    "fs-extra": "11.2.0",
-    "extract-zip":"2.0.1"
+    "yaserver": "^0.4.0"
   },
   "overrides": {
     "node-gyp-build": "4.8.1",

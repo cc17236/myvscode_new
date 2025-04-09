@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<style>
+		/* 添加全局滚动条控制 */
+		html,
+		body {
+			overflow: hidden;
+			/* 禁止全局滚动条 */
+			width: 100%;
+			height: 100%;
+			margin: 0;
+			padding: 0;
+		}
+
+		/* 容器高度计算调整 */
+		.update-container {
+			display: flex;
+			width: 100%;
+			height: 100vh;
+			/* 使用视口高度 */
+			flex-direction: column;
+			box-sizing: border-box;
+			/* 包含padding计算 */
+			padding-bottom: 20px;
+			/* 底部留白 */
+		}
+
+
+		.header-section {
+			display: flex;
+			align-items: center;
+			margin: 16px 16px 0;
+		}
+
+		.update-image {
+			width: 72px;
+			height: 72px;
+		}
+
+		.title-section {
+			margin-left: 12px;
+			flex: 1;
+		}
+
+		.title-row {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.version-title {
+			font-size: 16px;
+			color: #1b1f45;
+			font-weight: 600;
+			line-height: 24px;
+		}
+
+		/* 关闭按钮 */
+		.close-button {
+			width: 16px;
+			height: 16px;
+			cursor: pointer;
+		}
+
+		/* 更新内容区域 */
+		.update-content {
+			margin-top: 4px;
+			font-size: 14px;
+			color: #6E7592;
+			line-height: 22px;
+		}
+
+		/* 强制更新蒙层 */
+		.force-update-overlay {
+			background: rgba(0, 0, 0, 0.7);
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 999;
+		}
+
+		.blur-box {
+			background: #ffffff;
+			backdrop-filter: blur(10px);
+			width: 420px;
+			border-radius: 4px;
+			box-shadow: 0px 2px 12px 0px rgba(0, 0, 0, 0.05);
+		}
+
+		/* 操作按钮区域 */
+		.action-buttons {
+			display: flex;
+			justify-content: space-between;
+			margin: 20px 16px;
+		}
+
+		/* 滚动条样式 */
+		.descBox::-webkit-scrollbar {
+			width: 8px;
+		}
+
+		.descBox::-webkit-scrollbar-thumb {
+			background-color: #d8d8d8;
+		}
+	</style>
+</head>
+
+<body>
+	<!-- 普通更新弹窗 -->
+	<div id="updateContainer" class="update-container" style="display: block;">
+		<div class="header-section">
+			<img src="../../assets/updateImg.webp" class="update-image">
+			<div class="title-section">
+				<div class="title-row">
+					<div class="version-title">版本更新提示</div>
+					<img src="../../assets/forget-close-window.webp" class="close-button" onclick="closeDialog()">
+				</div>
+				<div class="update-content" id="updateMessage"></div>
+			</div>
+		</div>
+
+		<!-- 更新详情区域 -->
+		<div id="updateDetails" class="descBox">
+			<div id="updateDesc" class="descContent"></div>
+			<div id="expandSection" style="display: none;">
+				<button onclick="toggleExpand()" style="color:#3765fc">展开</button>
+				<img id="expandIcon" src="../../assets/arrowdownIcon.webp" style="width:14px;height:14px;">
+			</div>
+		</div>
+
+		<!-- 操作按钮 -->
+		<div class="action-buttons">
+			<label>
+				<input type="checkbox" id="versionCheckbox"> 此版本不再提示
+			</label>
+			<div>
+				<button onclick="closeDialog()">暂不更新</button>
+				<button onclick="updateNow()" style="background:#3765fc;color:#fff;">重启更新</button>
+			</div>
+		</div>
+	</div>
+
+	<!-- 强制更新弹窗 -->
+	<div id="forceUpdateOverlay" class="force-update-overlay" style="display: none;">
+		<div class="blur-box">
+			<div class="header-section">
+				<img src="../../assets/updateImg.webp" class="update-image">
+				<div class="title-section">
+					<div class="version-title">版本更新提示</div>
+					<div class="update-content" id="forceUpdateMessage"></div>
+				</div>
+			</div>
+
+			<div class="action-buttons" style="justify-content: flex-end;">
+				<button onclick="updateNow()" style="background:#3765fc;color:#fff;">立即更新</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		// // 状态管理
+		// let state = {
+		//   isExpanded: false,
+		//   isForceUpdate: false,
+		//   updateContent: ""
+		// };
+
+		// // 显示弹窗
+		// function showDialog(type = 'normal') {
+		//   if (type === 'force') {
+		//     document.getElementById('forceUpdateOverlay').style.display = 'flex';
+		//     state.isForceUpdate = true;
+		//   } else {
+		//     document.getElementById('updateContainer').style.display = 'flex';
+		//     state.isForceUpdate = false;
+		//   }
+		// }
+
+		// // 关闭弹窗
+		// function closeDialog() {
+		//   if (state.isForceUpdate) {
+		//     document.getElementById('forceUpdateOverlay').style.display = 'none';
+		//   } else {
+		//     document.getElementById('updateContainer').style.display = 'none';
+		//   }
+		// }
+
+		// // 切换展开状态
+		// function toggleExpand() {
+		//   state.isExpanded = !state.isExpanded;
+		//   const desc = document.getElementById('updateDesc');
+		//   const expandBtn = document.querySelector('#expandSection button');
+		//   const icon = document.getElementById('expandIcon');
+
+		//   if (state.isExpanded) {
+		//     desc.style.maxHeight = 'none';
+		//     expandBtn.textContent = '收起';
+		//     icon.src = 'assets/arrow-up.png';
+		//   } else {
+		//     desc.style.maxHeight = '66px';
+		//     expandBtn.textContent = '展开';
+		//     icon.src = 'assets/arrow-down.png';
+		//   }
+		// }
+
+		// 更新操作
+		function updateNow() {
+			window.electronAPI?.sendMessage("update-now", {});
+		}
+
+		// 初始化内容
+		// window.onload = function() {
+		// //   document.getElementById('updateMessage').innerHTML =
+		// //     `最新的版本已准备好，点击更新按钮将重启进行更新。<span style="color:#3765fc;">5~10</span>秒`;
+
+		// //   document.getElementById('updateDesc').innerHTML =
+		// //     '1. 优化用户界面交互体验<br>2. 修复已知系统问题<br>3. 提升系统性能';
+		// };
+	</script>
+</body>
+
+</html>

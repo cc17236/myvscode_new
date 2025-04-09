@@ -61,6 +61,7 @@ const vscodeResourceIncludes = [
 
 	// Electron Preload
 	'out-build/vs/base/parts/sandbox/electron-sandbox/preload.js',
+	'out-build/frontend/**/*',
 	'out-build/vs/base/parts/sandbox/electron-sandbox/preload-aux.js',
 
 	// Node Scripts
