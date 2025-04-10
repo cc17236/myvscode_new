@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import electron, { BrowserWindowConstructorOptions } from 'electron';
+import electron, { BrowserWindowConstructorOptions, screen } from 'electron';
 import { DeferredPromise, RunOnceScheduler, timeout, Delayer } from '../../../base/common/async.js';
 import { CancellationToken } from '../../../base/common/cancellation.js';
 import { toErrorMessage } from '../../../base/common/errorMessage.js';
@@ -45,7 +45,7 @@ import { ILoggerMainService } from '../../log/electron-main/loggerService.js';
 import { IInstantiationService } from '../../instantiation/common/instantiation.js';
 import { VSBuffer } from '../../../base/common/buffer.js';
 import { errorHandler } from '../../../base/common/errors.js';
-
+import { getDesktopWindow } from '../../../../frontend/modules/mainWindowsUtiles.js'
 export interface IWindowCreationOptions {
 	readonly state: IWindowState;
 	readonly extensionDevelopmentPath?: string[];
@@ -260,6 +260,91 @@ export abstract class BaseWindow extends Disposable implements IBaseWindow {
 			// to maximize or fullscreen, we only show after
 			this._win?.show();
 		}
+		this._win?.setParentWindow(getDesktopWindow());
+
+		const primaryDisplay = screen.getPrimaryDisplay();
+		const { workArea } = primaryDisplay;
+		this._win?.setBounds({
+			width: workArea.width * 0.9,          // 占据80%宽度
+			height: workArea.height * 0.9,        // 占据80%高度
+			x: workArea.x + workArea.width * 0.1,  // 左侧留出20%空间
+			y: workArea.y + workArea.height * 0.1, // 顶部留出20%空间
+		});
+		this._win?.setMovable(false);
+		// 监听父窗口尺寸变化
+		getDesktopWindow()?.on('resize', () => this.updateChildWindowBounds());
+		getDesktopWindow()?.on('move', () => this.updateChildWindowBounds());
+
+
+	}
+	// public updateChildWindowBounds(): void {
+	// 	// 获取父窗口内容区域尺寸，并确保返回值非 undefined
+	// 	const contentSize = getDesktopWindow()?.getContentSize();
+	// 	if (!contentSize || contentSize.length !== 2) {
+	// 		this.logService.warn('updateChildWindowBounds: Parent window content size is invalid or undefined.');
+	// 		return;
+	// 	}
+
+	// 	const [parentWidth, parentHeight] = contentSize;
+
+	// 	// 计算子窗口尺寸（父窗口的 90%）
+	// 	const childWidth = parentWidth * 0.9;
+	// 	const childHeight = parentHeight * 0.9;
+
+	// 	// 计算居中位置
+	// 	const x = (parentWidth - childWidth) / 2;
+	// 	const y = (parentHeight - childHeight) / 2;
+
+	// 	// 设置子窗口位置和尺寸
+	// 	this.win?.setBounds({
+	// 		x: Math.floor(x),
+	// 		y: Math.floor(y),
+	// 		width: Math.floor(childWidth),
+	// 		height: Math.floor(childHeight)
+	// 	});
+	// }
+
+	// 核心布局逻辑
+	public updateChildWindowBounds(): void {
+
+
+		// 获取父窗口的绝对位置和尺寸
+		const parentBounds = getDesktopWindow()?.getBounds();
+
+		// 计算子窗口位置和尺寸
+		const marginRatio = 0.1
+		// 确保 parentBounds 存在后再访问其属性
+		const childX = parentBounds && parentBounds.x + parentBounds.width * marginRatio || 0;
+		const childY = parentBounds && parentBounds.y + parentBounds.height * marginRatio || 0;
+		const childWidth = parentBounds && parentBounds.width * (1 - marginRatio) || 0;
+		const childHeight = parentBounds && parentBounds.height * (1 - marginRatio) || 0;
+		// // const childX = parentBounds.x + parentBounds.width * marginRatio;
+		// const childY = parentBounds.y + parentBounds.height * marginRatio
+		// const childWidth = parentBounds.width * (1 - marginRatio)
+		// const childHeight = parentBounds.height * (1 - marginRatio)
+
+		// 边界安全检测（防止超出屏幕）
+		const display = screen.getDisplayMatching(parentBounds!!);
+
+		const maxX = display.bounds.x + display.bounds.width;
+		const maxY = display.bounds.y + display.bounds.height;
+
+		// 最终计算结果
+		const finalBounds = {
+			x: Math.max(display.bounds.x, Math.min(childX, maxX - childWidth)),
+			y: Math.max(display.bounds.y, Math.min(childY, maxY - childHeight)),
+			width: Math.min(childWidth, maxX - childX),
+			height: Math.min(childHeight, maxY - childY)
+		};
+
+		// 应用布局
+		this.win?.setBounds({
+			x: Math.floor(finalBounds.x),
+			y: Math.floor(finalBounds.y),
+			width: Math.floor(finalBounds.width),
+			height: Math.floor(finalBounds.height)
+		});
+
 	}
 
 	private representedFilename: string | undefined;

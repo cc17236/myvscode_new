@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { BrowserWindow, session, ipcMain, type IpcMainEvent, app, Event } from 'electron';
+import { BrowserWindow, session, ipcMain, type IpcMainEvent, app, Event, screen } from 'electron';
 import { FileAccess } from '../../vs/base/common/network.js';
 import { setOperNo, setSSOTokenState, getServerIP, getServerPort, setBaseURL } from './globalState.js';
 import path from 'path';
@@ -12,11 +12,13 @@ import log from 'electron-log';
 import { getUpdateInfo, openClient, closeClient } from '../appUpdate/updateUtils.js';
 
 import { createServer, closeServer } from '../server/http.js';
-import { runupdate,execExeFile } from '../appUpdate/appUpdate.js';
+import { runupdate, execExeFile } from '../appUpdate/appUpdate.js';
+import { CodeApplication } from '../../vs/code/electron-main/app.js';
 
 let desktopWindow: BrowserWindow | null = null;
 let updateWindow: BrowserWindow | null = null;
-let isQuitting :boolean = false;
+let mCodeApp: CodeApplication | null = null;
+let isQuitting: boolean = false;
 const env_test: boolean = true;
 
 interface IPCChannels {
@@ -33,26 +35,47 @@ interface LoginData {
 interface NullData {
 }
 
-export const createDesktopWindow = (): void => {
+export const createDesktopWindow = (codeApp: CodeApplication): void => {
+	mCodeApp = codeApp;
 	createServer();
 	if (env_test) {
 		setBaseURL('http://158.1.82.97:9203');
 	} else {
 		setBaseURL('http://158.1.82.97:9203');
 	}
+	// 获取主显示器的可用区域（排除系统任务栏）
+	const primaryDisplay = screen.getPrimaryDisplay();
+	const { width, height } = primaryDisplay.workArea; // workArea 是正确的属性
+	const { x, y } = primaryDisplay.bounds; // 使用 bounds 替代 workAreaOrigin
 
+	// 创建无边框窗口
 	desktopWindow = new BrowserWindow({
-		width: 1200,
-		height: 800,
+		x,
+		y,
+		width,
+		height,
 		fullscreen: false,
 		webPreferences: {
+			// 必要的 web 预加载配置
 			preload: FileAccess.asFileUri('frontend/preload/desktopWindow.js').fsPath,
 			nodeIntegration: false,
 			contextIsolation: true,
 			sandbox: true,
 			webSecurity: true
-		},
+		}
 	});
+
+	// desktopWindow = new BrowserWindow({
+	// 	width: 1200,
+	// 	height: 800,
+	// 	webPreferences: {
+	// 		preload: FileAccess.asFileUri('frontend/preload/desktopWindow.js').fsPath,
+	// 		nodeIntegration: false,
+	// 		contextIsolation: true,
+	// 		sandbox: true,
+	// 		webSecurity: true
+	// 	},
+	// });
 	try {
 		desktopWindow.webContents.on('before-input-event', (_, input) => {
 			if (input.control && input.key.toLowerCase() === 'r') {
@@ -68,7 +91,7 @@ export const createDesktopWindow = (): void => {
 		});
 		setupIPC();
 		// desktopWindow?.webContents?.reloadIgnoringCache();
-		desktopWindow.loadURL("http://work.lowcode.hzbtest:8900/aop-h5/#/aop_enddesign/layouthome/list");
+		// desktopWindow.loadURL("http://work.lowcode.hzbtest:8900/aop-h5/#/aop_enddesign/layouthome/list");
 
 		// desktopWindow.loadFile(FileAccess.asFileUri('frontend/windows/updateWindow').fsPath);
 		// 获取当前文件的 __dirname
@@ -79,8 +102,13 @@ export const createDesktopWindow = (): void => {
 		// desktopWindow.loadURL(`file://${path.join(__dirname, '../windows/updateWindows/index.html')}`);
 
 		// desktopWindow.loadFile(path.join(__dirname, '../windows/updateWindows/index.html'));
-		// desktopWindow.loadURL(FileAccess.asBrowserUri(`frontend/windows/updateWindow/index.html`).toString(true));
-
+		desktopWindow.loadURL(FileAccess.asBrowserUri(`frontend/windows/updateWindow/index.html`).toString(true));
+		// desktopWindow.maximize();
+		// 处理显示变化
+		screen.on('display-metrics-changed', () => {
+			const newDisplay = screen.getPrimaryDisplay();
+			desktopWindow?.setBounds(newDisplay.workArea);
+		})
 		// desktopWindow.loadURL();
 		// 添加窗口关闭处理
 		desktopWindow.on('closed', () => {
@@ -90,7 +118,7 @@ export const createDesktopWindow = (): void => {
 	} catch (error) {
 		console.error('窗口初始化失败:', error instanceof Error ? error.message : String(error));
 	}
-	desktopWindow.webContents.openDevTools();
+	// desktopWindow.webContents.openDevTools();
 
 	app.on('before-quit', async (event: Event) => {
 		if (!isQuitting) {
@@ -98,7 +126,7 @@ export const createDesktopWindow = (): void => {
 			log.info(`before-quit isQuitting ${isQuitting}`);
 			event.preventDefault();
 			isQuitting = true;
-		}else{
+		} else {
 			log.info(`before-quit isQuitting ${isQuitting}`);
 		}
 	});
@@ -106,7 +134,7 @@ export const createDesktopWindow = (): void => {
 	app.on('quit', () => {
 		log.info(`app quit`);
 		execExeFile();
-	  });
+	});
 };
 
 export const createUpdateWindow = (): void => {
@@ -255,7 +283,9 @@ const handleUpdate = async (
 	nullData: NullData
 ): Promise<void> => {
 	log.info('========立即重启更新');
-	runupdate();
+	// runupdate();
+	await mCodeApp?.startup(true);
+
 };
 
 // 添加窗口管理函数

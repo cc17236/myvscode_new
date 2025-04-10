@@ -94,6 +94,8 @@ class CodeMain {
 
 	private async startup(): Promise<void> {
 
+
+		
 		// Set the error handler early enough so that we are not getting the
 		// default electron error dialog popping up
 		setUnexpectedErrorHandler(err => console.error(err));
@@ -142,7 +144,7 @@ class CodeMain {
 					evt.join('instanceLockfile', promises.unlink(environmentMainService.mainLockfile).catch(() => { /* ignored */ }));
 				});
 
-				return instantiationService.createInstance(CodeApplication, mainProcessNodeIpcServer, instanceEnvironment).startup();
+				return instantiationService.createInstance(CodeApplication, mainProcessNodeIpcServer, instanceEnvironment).startup(false);
 			});
 		} catch (error) {
 			instantiationService.invokeFunction(this.quit, error);

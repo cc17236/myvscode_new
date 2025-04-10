@@ -130,6 +130,8 @@ import { createDesktopWindow, createUpdateWindow } from '../../../frontend/modul
  *
  */
 
+let appInstantiationService: IInstantiationService;
+let initialProtocolUrls: IInitialProtocolUrls | undefined;
 
 export class CodeApplication extends Disposable {
 
@@ -524,88 +526,94 @@ export class CodeApplication extends Disposable {
 		//#endregion
 	}
 
-	async startup(): Promise<void> {
-		this.logService.debug('Starting VS Code');
-		this.logService.debug(`from: ${this.environmentMainService.appRoot}`);
-		this.logService.debug('args:', this.environmentMainService.args);
 
-		// Make sure we associate the program with the app user model id
-		// This will help Windows to associate the running program with
-		// any shortcut that is pinned to the taskbar and prevent showing
-		// two icons in the taskbar for the same app.
-		const win32AppUserModelId = this.productService.win32AppUserModelId;
-		if (isWindows && win32AppUserModelId) {
-			app.setAppUserModelId(win32AppUserModelId);
+	public async startup(iscode: boolean): Promise<void> {
+		if (!iscode) {
+			this.logService.debug('Starting VS Code');
+			this.logService.debug(`from: ${this.environmentMainService.appRoot}`);
+			this.logService.debug('args:', this.environmentMainService.args);
+
+			// Make sure we associate the program with the app user model id
+			// This will help Windows to associate the running program with
+			// any shortcut that is pinned to the taskbar and prevent showing
+			// two icons in the taskbar for the same app.
+			const win32AppUserModelId = this.productService.win32AppUserModelId;
+			if (isWindows && win32AppUserModelId) {
+				app.setAppUserModelId(win32AppUserModelId);
+			}
+
+			// Fix native tabs on macOS 10.13
+			// macOS enables a compatibility patch for any bundle ID beginning with
+			// "com.microsoft.", which breaks native tabs for VS Code when using this
+			// identifier (from the official build).
+			// Explicitly opt out of the patch here before creating any windows.
+			// See: https://github.com/microsoft/vscode/issues/35361#issuecomment-399794085
+			try {
+				if (isMacintosh && this.configurationService.getValue('window.nativeTabs') === true && !systemPreferences.getUserDefault('NSUseImprovedLayoutPass', 'boolean')) {
+					systemPreferences.setUserDefault('NSUseImprovedLayoutPass', 'boolean', true as any);
+				}
+			} catch (error) {
+				this.logService.error(error);
+			}
+
+			// Main process server (electron IPC based)
+			const mainProcessElectronServer = new ElectronIPCServer();
+			Event.once(this.lifecycleMainService.onWillShutdown)(e => {
+				if (e.reason === ShutdownReason.KILL) {
+					// When we go down abnormally, make sure to free up
+					// any IPC we accept from other windows to reduce
+					// the chance of doing work after we go down. Kill
+					// is special in that it does not orderly shutdown
+					// windows.
+					mainProcessElectronServer.dispose();
+				}
+			});
+
+			// Resolve unique machine ID
+			this.logService.trace('Resolving machine identifier...');
+			const [machineId, sqmId, devDeviceId] = await Promise.all([
+				resolveMachineId(this.stateService, this.logService),
+				resolveSqmId(this.stateService, this.logService),
+				resolvedevDeviceId(this.stateService, this.logService)
+			]);
+			this.logService.trace(`Resolved machine identifier: ${machineId}`);
+
+			// Shared process
+			const { sharedProcessReady, sharedProcessClient } = this.setupSharedProcess(machineId, sqmId, devDeviceId);
+
+			// Services
+			appInstantiationService = await this.initServices(machineId, sqmId, devDeviceId, sharedProcessReady);
+
+			// Error telemetry
+			appInstantiationService.invokeFunction(accessor => this._register(new ErrorTelemetry(accessor.get(ILogService), accessor.get(ITelemetryService))));
+
+			// Auth Handler
+			appInstantiationService.invokeFunction(accessor => accessor.get(IProxyAuthService));
+
+			// Transient profiles handler
+			this._register(appInstantiationService.createInstance(UserDataProfilesHandler));
+
+			// Init Channels
+			appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
+
+			// Setup Protocol URL Handlers
+			initialProtocolUrls = await appInstantiationService.invokeFunction(accessor => this.setupProtocolUrlHandlers(accessor, mainProcessElectronServer));
+
+			// Setup vscode-remote-resource protocol handler
+			this.setupManagedRemoteResourceUrlHandler(mainProcessElectronServer);
+
+			// Signal phase: ready - before opening first window
+			this.lifecycleMainService.phase = LifecycleMainPhase.Ready;
+			createDesktopWindow(this);
+			return;
 		}
 
-		// Fix native tabs on macOS 10.13
-		// macOS enables a compatibility patch for any bundle ID beginning with
-		// "com.microsoft.", which breaks native tabs for VS Code when using this
-		// identifier (from the official build).
-		// Explicitly opt out of the patch here before creating any windows.
-		// See: https://github.com/microsoft/vscode/issues/35361#issuecomment-399794085
-		try {
-			if (isMacintosh && this.configurationService.getValue('window.nativeTabs') === true && !systemPreferences.getUserDefault('NSUseImprovedLayoutPass', 'boolean')) {
-				systemPreferences.setUserDefault('NSUseImprovedLayoutPass', 'boolean', true as any);
-			}
-		} catch (error) {
-			this.logService.error(error);
-		}
-
-		// Main process server (electron IPC based)
-		const mainProcessElectronServer = new ElectronIPCServer();
-		Event.once(this.lifecycleMainService.onWillShutdown)(e => {
-			if (e.reason === ShutdownReason.KILL) {
-				// When we go down abnormally, make sure to free up
-				// any IPC we accept from other windows to reduce
-				// the chance of doing work after we go down. Kill
-				// is special in that it does not orderly shutdown
-				// windows.
-				mainProcessElectronServer.dispose();
-			}
-		});
-
-		// Resolve unique machine ID
-		this.logService.trace('Resolving machine identifier...');
-		const [machineId, sqmId, devDeviceId] = await Promise.all([
-			resolveMachineId(this.stateService, this.logService),
-			resolveSqmId(this.stateService, this.logService),
-			resolvedevDeviceId(this.stateService, this.logService)
-		]);
-		this.logService.trace(`Resolved machine identifier: ${machineId}`);
-
-		// Shared process
-		const { sharedProcessReady, sharedProcessClient } = this.setupSharedProcess(machineId, sqmId, devDeviceId);
-
-		// Services
-		const appInstantiationService = await this.initServices(machineId, sqmId, devDeviceId, sharedProcessReady);
-
-		// Error telemetry
-		appInstantiationService.invokeFunction(accessor => this._register(new ErrorTelemetry(accessor.get(ILogService), accessor.get(ITelemetryService))));
-
-		// Auth Handler
-		appInstantiationService.invokeFunction(accessor => accessor.get(IProxyAuthService));
-
-		// Transient profiles handler
-		this._register(appInstantiationService.createInstance(UserDataProfilesHandler));
-
-		// Init Channels
-		appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
-
-		// Setup Protocol URL Handlers
-		const initialProtocolUrls = await appInstantiationService.invokeFunction(accessor => this.setupProtocolUrlHandlers(accessor, mainProcessElectronServer));
-
-		// Setup vscode-remote-resource protocol handler
-		this.setupManagedRemoteResourceUrlHandler(mainProcessElectronServer);
-
-		// Signal phase: ready - before opening first window
-		this.lifecycleMainService.phase = LifecycleMainPhase.Ready;
-
+		// if (!iscode) {
+		// 	createDesktopWindow(this);
+		// 	return;
+		// }
 		// Open Windows
-
-		createDesktopWindow();
-		// await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
-
+		await appInstantiationService.invokeFunction(accessor => this.openFirstWindow(accessor, initialProtocolUrls));
 
 
 		// this.logService.trace(`bbbbbbb=============`);
@@ -1248,7 +1256,6 @@ export class CodeApplication extends Disposable {
 	}
 
 	private async openFirstWindow(accessor: ServicesAccessor, initialProtocolUrls: IInitialProtocolUrls | undefined): Promise<ICodeWindow[]> {
-		this.logService.info('update#setState', "aaaaaaaaaa");
 		const windowsMainService = this.windowsMainService = accessor.get(IWindowsMainService);
 		this.auxiliaryWindowsMainService = accessor.get(IAuxiliaryWindowsMainService);
 
